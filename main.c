@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
 {
 	char *dev, errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *handle;
-	const u_char *packet;
+	const u_char *packet,*pk_data;
 	struct pcap_pkthdr header;
 	int idx = 0;
 	char filter_exp[] = "port 80";		/* filter expression [3] */
@@ -153,7 +153,7 @@ int main(int argc, char* argv[])
 
 	while(1){
 		printf("\n\n[+] capture the packet\n\n");
-		packet = pcap_next(handle,&header);	
+		packet = pcap_next_ex(handle,&header,&pk_data);	
 		packet_ptr = packet;
 		for(int i=0;i<header.len;i++){
 			printf("%02x ",*(packet_ptr++));
@@ -162,13 +162,14 @@ int main(int argc, char* argv[])
 
 		printf("\n");
 
-		if(func_ether(packet,ether) == -1) continue;
-		else break;
-		if(func_ip(packet,ip) == -1) continue;
-		else break;
-		func_tcp(packet,tcp);
-		func_data(packet);
+		func_ether(pk_data,ether);
+		func_ip(pk_data,ip);
+		
+		func_tcp(pk_data,tcp);
+		func_data(pk_data);
 
+		if(packet < 0) break;
+		else continue;
 		//printf(">>>>> ");
 		//scanf("%d",&opt);
 		//if(opt == 1) break;
