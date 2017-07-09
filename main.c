@@ -163,14 +163,16 @@ int main(int argc, char* argv[])
 		printf("\n");
 
 		if(func_ether(packet,ether) == -1) continue;
+		else break;
 		if(func_ip(packet,ip) == -1) continue;
+		else break;
 		func_tcp(packet,tcp);
 		func_data(packet);
 
-		printf(">>>>> ");
-		scanf("%d",&opt);
-		if(opt == 1) break;
-		else continue;
+		//printf(">>>>> ");
+		//scanf("%d",&opt);
+		//if(opt == 1) break;
+		//else continue;
 	}
 	return 0;
 }
