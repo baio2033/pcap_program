@@ -5,7 +5,7 @@ packet capture programming in C
 
 use Makefile
 
-[+] Usage : $make; $make clean; $./pcap
+[+] Usage : $make; $make clean; $./pcap [device]
 
 =
 ======================================================================================
