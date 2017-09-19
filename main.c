@@ -42,9 +42,9 @@ struct tcp_header{
 };
 
 
-int func_ether(u_char* packet, struct ether_header *ether){
+void func_ether(u_char* packet, struct ether_header *ether){
+	struct ip_header *ip;
 	ether = (struct ether_header*)(packet);
-	if(ntohs(ether->ether_type) == 0x0800){
 	
 	printf("[+] Ethernet header information...\n");
 	printf("Destination MAC : ");
@@ -59,36 +59,50 @@ int func_ether(u_char* packet, struct ether_header *ether){
 		if(i<ETHER_ADDR_LEN-1) printf(":");
 		else printf("\n");
 	}
-		return 1;
+
+	if(ntohs(ether->ether_type) == 0x0800){
+		func_ip(packet, ip);
 	}
 	else{
-		return -1;
+		return;
 	}
 }
 
 
-int func_ip(u_char* packet, struct ip_header *ip){
+void func_ip(u_char* packet, struct ip_header *ip){
 	char buf[INET_ADDRSTRLEN];
+	struct tcp_header *tcp;
+
 	ip = (struct ip_header*)(packet+ETHER_SIZE);
-	if(ip->ip_proto == 0x06){
-	printf("\n\n[+] IP header information...\n");
+	printf("\n[+] IP header information...\n");
 	printf("source IP : %s\n",inet_ntop(AF_INET,&(ip->ip_src.s_addr),buf,INET_ADDRSTRLEN));
 	printf("destination IP : %s\n",inet_ntop(AF_INET,&(ip->ip_dst.s_addr),buf,INET_ADDRSTRLEN));
 	ip_size = ip->ip_hl*4;
 	printf("ip_size : %d\n",ip_size);
+	
+	if(ip->ip_proto == 0x06){
+		func_tcp(packet, tcp);
 	}
-	else{
-		return -1;
-	}
+	else
+		return;
 }
 
 void func_tcp(u_char* packet, struct tcp_header *tcp){
+	u_char *data;
 	tcp = (struct tcp_header*)(packet+ETHER_SIZE+ip_size);
 	tcp_size = tcp->tcp_off*4;
-	printf("\n\n[+] TCP header information...\n");
+	printf("\n[+] TCP header information...\n");
 	printf("TCP source port : %d\n",ntohs(tcp->tcp_src));
 	printf("TCP destination port : %d\n",ntohs(tcp->tcp_dst));
 	printf("TCP size : %d\n",tcp_size);
+
+	if(tcp_size > 20){
+		data = packet+ETHER_SIZE+ip_size+tcp_size;
+		for(int i=0;i<16;i++)
+			printf("%02x ",data[i]);
+	}
+	printf("\n");
+	return;
 }
 
 void func_data(u_char* packet){
@@ -104,21 +118,15 @@ int main(int argc, char* argv[])
 	const u_char *packet,*pk_data;
 	struct pcap_pkthdr header;
 	int idx = 0;
-	char filter_exp[] = "port 80";		/* filter expression [3] */
-	struct bpf_program fp;			/* compiled filter program (expression) */
-	bpf_u_int32 mask;			/* subnet mask */
-	bpf_u_int32 net;			/* ip */
 	u_char *packet_ptr;
-
+	int ret;
+	int cnt = 0;
 	struct ether_header *ether;
 	struct ip_header *ip;
 	struct tcp_header *tcp;
 
 	u_char *data;
-	int opt = 1;
 
-	//dev = pcap_lookupdev(errbuf);
-	//dev = "dum0";
 	dev = argv[1];
 
 	if(dev == NULL){
@@ -137,43 +145,28 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Device %s doesn't provide Ethernet headers - not supported\n", dev);
 		return(2);
 	}
-
-	if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-		fprintf(stderr, "Couldn't parse filter %s: %s\n",
-		    filter_exp, pcap_geterr(handle));
-		exit(EXIT_FAILURE);
-	}
-
-	/* apply the compiled filter */
-	if (pcap_setfilter(handle, &fp) == -1) {
-		fprintf(stderr, "Couldn't install filter %s: %s\n",
-		    filter_exp, pcap_geterr(handle));
-		exit(EXIT_FAILURE);
-	}
-
+	
 	while(1){
-		printf("\n\n[+] capture the packet\n\n");
-		packet = pcap_next_ex(handle,&header,&pk_data);	
-		packet_ptr = packet;
-		for(int i=0;i<header.len;i++){
-			printf("%02x ",*(packet_ptr++));
-			if(i%16==0 && i!=0) printf("\n");
+		ret = pcap_next_ex(handle,&header,&pk_data);	
+		if(ret == 0){
+			printf("[+] time out...\n");
+			continue;
 		}
+		else if(ret < 0){
+			printf("[+] fail to receive packet!\n");
+			break;
+		}
+		else{
+			for(int i=0;i<header.len;i++){
+				printf("%02x ",*(packet_ptr++));
+				if(i%16==0 && i!=0) printf("\n");
+			}
 
-		printf("\n");
-
-		func_ether(pk_data,ether);
-		func_ip(pk_data,ip);
-		
-		func_tcp(pk_data,tcp);
-		func_data(pk_data);
-
-		if(packet < 0) break;
-		else continue;
-		//printf(">>>>> ");
-		//scanf("%d",&opt);
-		//if(opt == 1) break;
-		//else continue;
+			printf("\n");
+			printf("###################### frame [%d] #############################\n",cnt++);
+			func_ether(pk_data,ether);
+			printf("###############################################################\n\n");
+		}
 	}
 	return 0;
 }
