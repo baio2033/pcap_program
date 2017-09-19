@@ -97,18 +97,13 @@ void func_tcp(u_char* packet, struct tcp_header *tcp){
 	printf("TCP size : %d\n",tcp_size);
 
 	if(tcp_size > 20){
+		printf("\n[+] Data Section (16 bytes hex values)\n");
 		data = packet+ETHER_SIZE+ip_size+tcp_size;
 		for(int i=0;i<16;i++)
 			printf("%02x ",data[i]);
 	}
 	printf("\n");
 	return;
-}
-
-void func_data(u_char* packet){
-	u_char *data = packet+ETHER_SIZE+ip_size+tcp_size;
-	printf("\n\n[+] data section...\n");
-	printf("%s",data);
 }
 
 int main(int argc, char* argv[])
