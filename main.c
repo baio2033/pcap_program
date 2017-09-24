@@ -8,8 +8,14 @@
 #define ETHER_SIZE 14
 #define ETHER_ADDR_LEN 6
 
+u_int16_t total_len = 0;
+u_int16_t cur_len = 0;
 u_int16_t ip_size = 0;
 u_int16_t tcp_size = 0;
+
+void func_ether(u_char* packet);
+void func_ip(u_char* packet);
+void func_tcp(u_char* packet);
 
 struct ether_header{
 	u_int8_t ether_dhost[ETHER_ADDR_LEN];
@@ -42,10 +48,9 @@ struct tcp_header{
 };
 
 
-void func_ether(u_char* packet, struct ether_header *ether){
-	struct ip_header *ip;
-	ether = (struct ether_header*)(packet);
-	
+void func_ether(u_char* packet){
+	struct ether_header *ether = (struct ether_header*)(packet);
+
 	printf("[+] Ethernet header information...\n");
 	printf("Destination MAC : ");
 	for(int i=0;i<ETHER_ADDR_LEN;i++){
@@ -61,7 +66,8 @@ void func_ether(u_char* packet, struct ether_header *ether){
 	}
 
 	if(ntohs(ether->ether_type) == 0x0800){
-		func_ip(packet, ip);
+		cur_len = ETHER_SIZE;
+		func_ip(packet);
 	}
 	else{
 		return;
@@ -69,34 +75,37 @@ void func_ether(u_char* packet, struct ether_header *ether){
 }
 
 
-void func_ip(u_char* packet, struct ip_header *ip){
+void func_ip(u_char* packet){
 	char buf[INET_ADDRSTRLEN];
-	struct tcp_header *tcp;
+	
 
-	ip = (struct ip_header*)(packet+ETHER_SIZE);
+	struct ip_header *ip = (struct ip_header*)(packet+ETHER_SIZE);
 	printf("\n[+] IP header information...\n");
 	printf("source IP : %s\n",inet_ntop(AF_INET,&(ip->ip_src.s_addr),buf,INET_ADDRSTRLEN));
 	printf("destination IP : %s\n",inet_ntop(AF_INET,&(ip->ip_dst.s_addr),buf,INET_ADDRSTRLEN));
 	ip_size = ip->ip_hl*4;
 	printf("ip_size : %d\n",ip_size);
-	
+	printf("total length of packet : %d\n",ip->ip_len);
+	total_len = ip->ip_len;	
 	if(ip->ip_proto == 0x06){
-		func_tcp(packet, tcp);
+		cur_len += ip_size;
+		func_tcp(packet);
 	}
 	else
 		return;
 }
 
-void func_tcp(u_char* packet, struct tcp_header *tcp){
+void func_tcp(u_char* packet){
 	u_char *data;
-	tcp = (struct tcp_header*)(packet+ETHER_SIZE+ip_size);
+	struct tcp_header *tcp = (struct tcp_header*)(packet+ETHER_SIZE+ip_size);
 	tcp_size = tcp->tcp_off*4;
 	printf("\n[+] TCP header information...\n");
 	printf("TCP source port : %d\n",ntohs(tcp->tcp_src));
 	printf("TCP destination port : %d\n",ntohs(tcp->tcp_dst));
 	printf("TCP size : %d\n",tcp_size);
-
-	if(tcp_size > 20){
+	
+	cur_len += tcp_size;
+	if(total_len > cur_len){
 		printf("\n[+] Data Section (16 bytes hex values)\n");
 		data = packet+ETHER_SIZE+ip_size+tcp_size;
 		for(int i=0;i<16;i++)
@@ -159,7 +168,7 @@ int main(int argc, char* argv[])
 
 			printf("\n");
 			printf("###################### frame [%d] #############################\n",cnt++);
-			func_ether(pk_data,ether);
+			func_ether(pk_data);
 			printf("###############################################################\n\n");
 		}
 	}
