@@ -66,7 +66,7 @@ void func_ether(u_char* packet){
 	}
 
 	if(ntohs(ether->ether_type) == 0x0800){
-		cur_len = ETHER_SIZE;
+		cur_len = 0;
 		func_ip(packet);
 	}
 	else{
